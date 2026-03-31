@@ -12,7 +12,7 @@ from detectron2.config import configurable
 from detectron2.layers import Conv2d, ShapeSpec, get_norm
 from detectron2.modeling import SEM_SEG_HEADS_REGISTRY
 
-from ..transformer.cat_seg_predictor import CATSegPredictor
+from ..transformer.cat_seg_predictor_ours import CATSegPredictor
 
 
 @SEM_SEG_HEADS_REGISTRY.register()

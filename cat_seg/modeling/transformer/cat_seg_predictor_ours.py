@@ -11,7 +11,7 @@ from torch.nn import functional as F
 from detectron2.config import configurable
 from detectron2.layers import Conv2d
 
-from .model import Aggregator
+from .model_ours import Aggregator
 from cat_seg.third_party import clip
 from cat_seg.third_party import imagenet_templates
 
