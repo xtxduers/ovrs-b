@@ -1,0 +1,28 @@
+output/
+output_*/
+OUTPUT_DIR/
+
+# 忽略数据集目录（JSON 类别文件除外）
+datasets/*
+!datasets/*.json
+OVS_datasets/
+
+# 忽略模型权重等大文件
+MODEL.WEIGHTS
+*.pth
+*.pt
+*.h5
+*.onnx
+*.pkl
+*.joblib
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 其他临时文件
+*.log
+logs/
+runs/
+.ipynb_checkpoints/
+

@@ -55,5 +55,5 @@ def register_iSAID(root):
             **meta,
         )
 
-root = "/code/OVS_datasets"
+root = "/home/lh/复现/datasets"
 register_iSAID(root)

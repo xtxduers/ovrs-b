@@ -9,7 +9,7 @@ from PIL import Image
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from tqdm import tqdm
 
-#from .model import build_model
+# from .model import build_model
 from .model_vpt import build_model
 from .simple_tokenizer import SimpleTokenizer as _Tokenizer
 
@@ -23,7 +23,7 @@ _MODELS = {
     "RN50x16": "https://openaipublic.azureedge.net/clip/models/52378b407f34354e150460fe41077663dd5b39c54cd0bfd2b27167a4a06ec9aa/RN50x16.pt",
     "RN50x64": "https://openaipublic.azureedge.net/clip/models/be1cfb55d75a9666199fb2206c106743da0f6468c9d327f3e0d0a543a9919d9c/RN50x64.pt",
     "ViT-B/32": "https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
-    "ViT-B/16": "/code/clip_weights/ViT-B-16.pt",
+    "ViT-B/16": os.path.expanduser("~/.cache/clip/ViT-B-16.pt"),
     "ViT-L/14": "https://openaipublic.azureedge.net/clip/models/b8cca3fd41ae0c99ba7e8951adf17d267cdb84cd88be6f7c2e0eca1737a03836/ViT-L-14.pt",
     "ViT-L/14@336px": "https://openaipublic.azureedge.net/clip/models/3035c92b350959924f9f00213499208652fc7ea050643e8b385c2dac08641f02/ViT-L-14-336px.pt",
 }
@@ -32,7 +32,7 @@ _MODELS = {
 def _download(url: str, root: str = os.path.expanduser("~/.cache/clip")):
     os.makedirs(root, exist_ok=True)
     filename = os.path.basename(url)
-    
+
     expected_sha256 = url.split("/")[-2]
     download_target = os.path.join(root, filename)
 
@@ -46,7 +46,7 @@ def _download(url: str, root: str = os.path.expanduser("~/.cache/clip")):
             warnings.warn(f"{download_target} exists, but the SHA256 checksum does not match; re-downloading the file")
 
     with urllib.request.urlopen(url) as source, open(download_target, "wb") as output:
-        with tqdm(total=int(source.info().get("Content-Length")), ncols=80) as loop:        
+        with tqdm(total=int(source.info().get("Content-Length")), ncols=80) as loop:
             while True:
                 buffer = source.read(8192)
                 if not buffer:
@@ -65,12 +65,19 @@ def available_models():
     return list(_MODELS.keys())
 
 
-def load(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_available() else "cpu", jit=True, prompt_depth=0, prompt_length=0):
+def load(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_available() else "cpu", jit=True,
+         prompt_depth=0, prompt_length=0):
     if name not in _MODELS:
         raise RuntimeError(f"Model {name} not found; available models = {available_models()}")
 
-    # model_path = _download(_MODELS[name])
-    model_path = _MODELS[name]
+    # 检查本地缓存文件
+    cache_path = os.path.expanduser(f"~/.cache/clip/{name.replace('/', '-').replace('@', '-')}.pt")
+    if os.path.exists(cache_path):
+        model_path = cache_path
+        print(f"Using cached model: {model_path}")
+    else:
+        model_path = _download(_MODELS[name])
+
     model = torch.jit.load(model_path, map_location=device if jit else "cpu").eval()
     n_px = model.input_resolution.item()
 
@@ -131,7 +138,8 @@ def load(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_a
     return model, transform
 
 
-def load_custom(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_available() else "cpu", jit=True, n_px=224):
+def load_custom(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_available() else "cpu", jit=True,
+                n_px=224):
     if name not in _MODELS:
         raise RuntimeError(f"Model {name} not found; available models = {available_models()}")
 
@@ -194,6 +202,7 @@ def load_custom(name: str, device: Union[str, torch.device] = "cuda" if torch.cu
         model.float()
 
     return model, transform
+
 
 def tokenize(texts: Union[str, List[str]], context_length: int = 77):
     if isinstance(texts, str):
