@@ -1,4 +1,4 @@
-# addmoudle: 基于熵的多尺度特征融合模块
+# addmodule: 基于熵的多尺度特征融合模块
 
 本分支实现了一个模块化的熵驱动尺度加权机制，用于在 **cost aggregation 后的 cost volume** 上估计类别尺度倾向，并对中间层特征进行加权融合。
 
@@ -72,4 +72,3 @@ python train_net.py --config configs/vitl_336.yaml MODEL.SEM_SEG_HEAD.ENTROPY_ST
 ```bash
 python train_net.py --config configs/vitl_336.yaml MODEL.SEM_SEG_HEAD.ENTROPY_STAGE 2 MODEL.WEIGHTS <stage1_checkpoint>
 ```
-

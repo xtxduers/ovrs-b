@@ -49,13 +49,18 @@ class EntropyScaleFusion(nn.Module):
         response = cost_volume.mean(dim=1)  # B T H W
         prob = torch.softmax(response.flatten(-2) / self.temperature, dim=-1)
         entropy = -(prob * torch.log(prob + self.eps)).sum(dim=-1)  # B T
-        entropy = entropy / max(math.log(float(h * w)), self.eps)
+        # Clamp denominator to avoid unstable normalization on tiny maps (e.g., h*w == 1).
+        entropy_denom = max(math.log(float(h * w)), 1.0)
+        entropy = entropy / entropy_denom
 
         if t > 1:
+            # Convert entropy values into rank indices, then normalize to [0, 1].
+            # For small class counts (e.g., t == 2), endpoints {0, 1} are expected.
             order = torch.argsort(entropy, dim=1, descending=False)
             rank = torch.argsort(order, dim=1).float()
             rank = rank / float(t - 1)
         else:
+            # Single-class case has no relative ranking.
             rank = torch.zeros_like(entropy)
 
         weights = self.mlp(rank.unsqueeze(-1))

@@ -14,7 +14,7 @@ from einops.layers.torch import Rearrange
 from timm.layers import PatchEmbed, Mlp, DropPath, to_2tuple, to_ntuple, trunc_normal_, _assert
 from .entropy_scale_fusion import EntropyScaleFusion
 
-# Modified Swin Transformer blocks for guidance implementetion
+# Modified Swin Transformer blocks for guidance implementation
 # https://github.com/microsoft/Swin-Transformer/blob/main/models/swin_transformer.py
 def window_partition(x, window_size: int):
     """
@@ -730,6 +730,13 @@ class Aggregator(nn.Module):
         g4_up = F.interpolate(g4, size=g3.shape[-2:], mode="bilinear", align_corners=False)
         g5_up = F.interpolate(g5, size=g3.shape[-2:], mode="bilinear", align_corners=False)
         target_c = min(g3.size(1), g4_up.size(1), g5_up.size(1))
+        if target_c <= 0:
+            # Keep C=1 so downstream `mean(dim=2)` remains valid and numerically safe.
+            return torch.zeros(
+                (g3.size(0), class_weights.size(1), 1, g3.size(2), g3.size(3)),
+                device=g3.device,
+                dtype=g3.dtype,
+            )
         g3 = g3[:, :target_c]
         g4_up = g4_up[:, :target_c]
         g5_up = g5_up[:, :target_c]
@@ -822,6 +829,7 @@ class Aggregator(nn.Module):
 
         class_scale_weights = self.scale_fusion(corr_embed)
         fused_guidance = self.fuse_guidance(appearance_guidance, class_scale_weights)
+        # Multiplicative modulation in [1, 2] keeps base path while adding scale-aware gain.
         scale_map = fused_guidance.mean(dim=2)
         scale_map = torch.sigmoid(scale_map).unsqueeze(1)
         corr_embed = corr_embed * (1.0 + scale_map)
