@@ -42,6 +42,11 @@ class CATSegPredictor(nn.Module):
         feature_resolution: tuple,
         window_sizes: tuple,
         attention_type: str,
+        entropy_temperature: float,
+        entropy_eps: float,
+        entropy_confidence_threshold: float,
+        entropy_mlp_hidden_dim: int,
+        entropy_stage: int,
     ):
         """
         Args:
@@ -110,6 +115,11 @@ class CATSegPredictor(nn.Module):
             window_size=window_sizes,
             attention_type=attention_type,
             prompt_channel=len(prompt_templates),
+            entropy_temperature=entropy_temperature,
+            entropy_eps=entropy_eps,
+            entropy_confidence_threshold=entropy_confidence_threshold,
+            entropy_mlp_hidden_dim=entropy_mlp_hidden_dim,
+            entropy_stage=entropy_stage,
             )
         self.transformer = transformer
         
@@ -145,6 +155,11 @@ class CATSegPredictor(nn.Module):
         ret["feature_resolution"] = cfg.MODEL.SEM_SEG_HEAD.FEATURE_RESOLUTION
         ret["window_sizes"] = cfg.MODEL.SEM_SEG_HEAD.WINDOW_SIZES
         ret["attention_type"] = cfg.MODEL.SEM_SEG_HEAD.ATTENTION_TYPE
+        ret["entropy_temperature"] = cfg.MODEL.SEM_SEG_HEAD.ENTROPY_TEMPERATURE
+        ret["entropy_eps"] = cfg.MODEL.SEM_SEG_HEAD.ENTROPY_EPS
+        ret["entropy_confidence_threshold"] = cfg.MODEL.SEM_SEG_HEAD.ENTROPY_CONFIDENCE_THRESHOLD
+        ret["entropy_mlp_hidden_dim"] = cfg.MODEL.SEM_SEG_HEAD.ENTROPY_MLP_HIDDEN_DIM
+        ret["entropy_stage"] = cfg.MODEL.SEM_SEG_HEAD.ENTROPY_STAGE
 
         return ret
 

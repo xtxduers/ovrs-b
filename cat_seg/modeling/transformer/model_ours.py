@@ -659,6 +659,9 @@ class Aggregator(nn.Module):
             mlp_hidden_dim=entropy_mlp_hidden_dim,
             stage=entropy_stage,
         )
+        if entropy_stage == 1:
+            for p in self.scale_fusion.mlp.parameters():
+                p.requires_grad = False
 
     def feature_map(self, img_feats, text_feats):
         # concatenated feature volume for feature aggregation baselines
@@ -818,7 +821,10 @@ class Aggregator(nn.Module):
             corr_embed = layer(corr_embed, projected_guidance, projected_text_guidance)
 
         class_scale_weights = self.scale_fusion(corr_embed)
-        _ = self.fuse_guidance(appearance_guidance, class_scale_weights)
+        fused_guidance = self.fuse_guidance(appearance_guidance, class_scale_weights)
+        scale_map = fused_guidance.mean(dim=2)
+        scale_map = torch.sigmoid(scale_map).unsqueeze(1)
+        corr_embed = corr_embed * (1.0 + scale_map)
 
         logit = self.conv_decoder(corr_embed, projected_decoder_guidance)
         if classes is not None:
