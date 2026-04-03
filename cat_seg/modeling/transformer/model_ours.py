@@ -12,6 +12,7 @@ from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
 from timm.layers import PatchEmbed, Mlp, DropPath, to_2tuple, to_ntuple, trunc_normal_, _assert
+from .entropy_scale_fusion import EntropyScaleFusion
 
 # Modified Swin Transformer blocks for guidance implementetion
 # https://github.com/microsoft/Swin-Transformer/blob/main/models/swin_transformer.py
@@ -584,6 +585,11 @@ class Aggregator(nn.Module):
         attention_type='linear',
         prompt_channel=1,
         pad_len=256,
+        entropy_temperature=1.0,
+        entropy_eps=1e-6,
+        entropy_confidence_threshold=0.5,
+        entropy_mlp_hidden_dim=16,
+        entropy_stage=2,
     ) -> None:
         """
         Cost Aggregation Model for CAT-Seg
@@ -645,6 +651,14 @@ class Aggregator(nn.Module):
         self.head = nn.Conv2d(decoder_dims[1], 1, kernel_size=3, stride=1, padding=1)
 
         self.pad_len = pad_len
+        self.scale_fusion = EntropyScaleFusion(
+            num_scales=3,
+            temperature=entropy_temperature,
+            eps=entropy_eps,
+            confidence_threshold=entropy_confidence_threshold,
+            mlp_hidden_dim=entropy_mlp_hidden_dim,
+            stage=entropy_stage,
+        )
 
     def feature_map(self, img_feats, text_feats):
         # concatenated feature volume for feature aggregation baselines
@@ -700,6 +714,25 @@ class Aggregator(nn.Module):
         corr_embed = self.head(corr_embed)
         corr_embed = rearrange(corr_embed, '(B T) () H W -> B T H W', B=B)
         return corr_embed
+
+    def fuse_guidance(self, guidance, class_weights):
+        """
+        Args:
+            guidance: [res3, res4, res5]
+            class_weights: B T 3
+        Returns:
+            fused_guidance: B T C H W
+        """
+        g3, g4, g5 = guidance
+        g4_up = F.interpolate(g4, size=g3.shape[-2:], mode="bilinear", align_corners=False)
+        g5_up = F.interpolate(g5, size=g3.shape[-2:], mode="bilinear", align_corners=False)
+        target_c = min(g3.size(1), g4_up.size(1), g5_up.size(1))
+        g3 = g3[:, :target_c]
+        g4_up = g4_up[:, :target_c]
+        g5_up = g5_up[:, :target_c]
+        stacked = torch.stack([g3, g4_up, g5_up], dim=2)  # B C 3 H W
+        fused = torch.einsum("btm,bcmhw->btchw", class_weights, stacked)
+        return fused
     
     def forward(self, img_feats, text_feats, appearance_guidance):
         """
@@ -783,6 +816,9 @@ class Aggregator(nn.Module):
 
         for layer in self.layers:
             corr_embed = layer(corr_embed, projected_guidance, projected_text_guidance)
+
+        class_scale_weights = self.scale_fusion(corr_embed)
+        _ = self.fuse_guidance(appearance_guidance, class_scale_weights)
 
         logit = self.conv_decoder(corr_embed, projected_decoder_guidance)
         if classes is not None:
